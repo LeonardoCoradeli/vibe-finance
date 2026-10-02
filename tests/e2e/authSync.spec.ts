@@ -4,12 +4,12 @@ test.describe('Autenticação com Nuvem e Conta QA E2E', () => {
   test('deve abrir modal de credenciais, permitir login com Conta QA e gerenciar sessão', async ({ page }) => {
     await page.goto('/');
 
-    // 1. Clica no botão Salvar na Nuvem
-    await page.getByRole('button', { name: 'Salvar na Nuvem' }).click();
+    // 1. Clica no botão Entrar com Google
+    await page.getByRole('button', { name: /Entrar com Google|Salvar na Nuvem/i }).click();
 
-    // 2. Deve abrir o modal com orientações de credenciais Firebase
+    // 2. Deve abrir o modal com orientações de credenciais Firebase e botão oficial do Google
     await expect(page.getByText('Conexão com a Nuvem')).toBeVisible();
-    await expect(page.getByText('Como conectar seu projeto Firebase real:')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continuar com o Google' })).toBeVisible();
 
     // 3. Clica para Entrar como Conta de QA
     await page.getByRole('button', { name: 'Entrar como Conta de QA' }).click();
@@ -36,7 +36,7 @@ test.describe('Autenticação com Nuvem e Conta QA E2E', () => {
     await expect(page.getByText('Aporte QA Autenticado')).not.toBeVisible();
 
     // 7. Faz Login novamente com a mesma Conta de QA e valida a RECUPERAÇÃO DOS DADOS salvos na nuvem
-    await page.getByRole('button', { name: 'Salvar na Nuvem' }).click();
+    await page.getByRole('button', { name: /Entrar com Google|Salvar na Nuvem/i }).click();
     await page.getByRole('button', { name: 'Entrar como Conta de QA' }).click();
 
     // Aguarda sincronização e valida que os dados salvos anteriormente foram recuperados da nuvem
@@ -48,7 +48,7 @@ test.describe('Autenticação com Nuvem e Conta QA E2E', () => {
     await page.goto('/');
 
     // 1. Entra como Conta de QA
-    await page.getByRole('button', { name: 'Salvar na Nuvem' }).click();
+    await page.getByRole('button', { name: /Entrar com Google|Salvar na Nuvem/i }).click();
     await page.getByRole('button', { name: 'Entrar como Conta de QA' }).click();
     await expect(page.getByText(/Nuvem: qa\.tester/i)).toBeVisible();
 
@@ -82,6 +82,32 @@ test.describe('Autenticação com Nuvem e Conta QA E2E', () => {
 
     // 6. Faz Logout e valida que a sessão é encerrada
     await page.getByTitle('Sair da conta').click();
+    await expect(page.getByText('Modo Convidado (Em memória)')).toBeVisible();
+  });
+
+  test('deve abrir o modal de perfis ao clicar no título Gestão Financeira e permitir alternar para Modo Convidado', async ({ page }) => {
+    await page.goto('/');
+
+    // 1. Clica no título/logo "Gestão Financeira Pro" no Header
+    await page.getByRole('button', { name: /Gestão Financeira/i }).click();
+
+    // 2. Deve abrir o Modal de Perfis
+    await expect(page.getByText('Perfis de Acesso & Conexão com a Nuvem')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Modo Convidado' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Continuar com o Google' })).toBeVisible();
+
+    // 3. Entra como Conta de QA pelo modal de perfis
+    await page.getByRole('button', { name: 'Entrar como Conta de QA' }).click();
+    await expect(page.getByText(/Nuvem: qa\.tester/i)).toBeVisible();
+
+    // 4. Clica novamente no título "Gestão Financeira" para abrir o modal de perfis
+    await page.getByRole('button', { name: /Gestão Financeira/i }).click();
+    await expect(page.getByText('Perfis de Acesso & Conexão com a Nuvem')).toBeVisible();
+
+    // 5. Clica no botão "Mudar para Convidado"
+    await page.getByRole('button', { name: 'Mudar para Convidado' }).click();
+
+    // 6. Confirma que voltou ao Modo Convidado
     await expect(page.getByText('Modo Convidado (Em memória)')).toBeVisible();
   });
 });

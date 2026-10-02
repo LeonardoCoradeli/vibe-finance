@@ -2,12 +2,13 @@
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
-import { auth, googleProvider, isFirebaseConfigured } from './config';
+import { auth, googleProvider, isFirebaseConfigured, isQaModeEnabled } from './config';
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   isConfigured: boolean;
+  isQaModeEnabled: boolean;
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   signInWithQAMock: (account?: { uid: string; email: string; displayName: string }) => void;
   logout: () => Promise<void>;
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   isConfigured: false,
+  isQaModeEnabled: false,
   signInWithGoogle: async () => ({ success: false, error: 'Firebase não configurado' }),
   signInWithQAMock: () => {},
   logout: async () => {},
@@ -58,7 +60,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isFirebaseConfigured || !auth || !googleProvider) {
       return {
         success: false,
-        error: 'Para sincronizar com a sua conta Google real, configure suas credenciais do Firebase no arquivo .env.local (veja o modelo em .env.example). Alternativamente, você pode testar com a Conta de QA!',
+        error:
+          'Credenciais do Firebase não detectadas. Configure as variáveis NEXT_PUBLIC_FIREBASE_* no seu arquivo .env ou no painel de Environment Variables da Vercel (consulte .env.example).',
       };
     }
 
@@ -66,6 +69,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await signInWithPopup(auth, googleProvider);
       return { success: true };
     } catch (error: any) {
+      const code = error?.code || '';
+      if (code === 'auth/operation-not-allowed') {
+        return {
+          success: false,
+          error:
+            'O provedor Google ainda não foi ativado no Firebase Console do projeto teste-dc3ae. Acesse Authentication > Sign-in method > Google e ative a chave. Enquanto isso, você pode entrar utilizando a Conta de QA!',
+        };
+      }
+      if (code === 'auth/popup-closed-by-user') {
+        return {
+          success: false,
+          error: 'A janela de login do Google foi fechada antes de concluir a autenticação.',
+        };
+      }
+      if (code === 'auth/popup-blocked') {
+        return {
+          success: false,
+          error: 'O pop-up de login foi bloqueado pelo seu navegador. Por favor, permita pop-ups para este site.',
+        };
+      }
+      if (code === 'auth/unauthorized-domain') {
+        return {
+          success: false,
+          error:
+            'Este domínio não está autorizado no Firebase Authentication. Acesse Authentication > Settings > Authorized domains e adicione o domínio atual.',
+        };
+      }
       return {
         success: false,
         error: error?.message || 'Falha ao autenticar com o Google.',
@@ -115,6 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         loading,
         isConfigured: isFirebaseConfigured,
+        isQaModeEnabled,
         signInWithGoogle,
         signInWithQAMock,
         logout,
