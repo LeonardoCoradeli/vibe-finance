@@ -9,6 +9,7 @@ interface AuthContextType {
   loading: boolean;
   isConfigured: boolean;
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  signInWithQAMock: (account?: { uid: string; email: string; displayName: string }) => void;
   logout: () => Promise<void>;
 }
 
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isConfigured: false,
   signInWithGoogle: async () => ({ success: false, error: 'Firebase não configurado' }),
+  signInWithQAMock: () => {},
   logout: async () => {},
 });
 
@@ -42,7 +44,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!isFirebaseConfigured || !auth || !googleProvider) {
       return {
         success: false,
-        error: 'Para sincronizar na nuvem, configure suas credenciais do Firebase no arquivo .env.local (veja .env.example).',
+        error: 'Para sincronizar com a sua conta Google real, configure suas credenciais do Firebase no arquivo .env.local (veja o modelo em .env.example). Alternativamente, você pode testar com a Conta de QA!',
       };
     }
 
@@ -57,10 +59,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const signInWithQAMock = (account = { uid: 'qa-tester-001', email: 'qa.tester@financas.app', displayName: 'QA Tester' }) => {
+    setUser({
+      uid: account.uid,
+      email: account.email,
+      displayName: account.displayName,
+      photoURL: null,
+    });
+  };
+
   const logout = async () => {
-    if (auth) {
+    if (auth && isFirebaseConfigured) {
       await signOut(auth);
     }
+    setUser(null);
   };
 
   return (
@@ -70,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         isConfigured: isFirebaseConfigured,
         signInWithGoogle,
+        signInWithQAMock,
         logout,
       }}
     >

@@ -31,6 +31,17 @@ export function TransactionModal({ isOpen, onClose }: TransactionModalProps) {
   });
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  React.useEffect(() => {
+    if (isOpen) {
+      setType('expense');
+      setDescription('');
+      setAmount('');
+      setCategory('moradia_contas');
+      setWallet('LIVRE');
+      setErrorMessage(null);
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   // Atualizar carteira recomendada ao mudar categoria se for incompatível
