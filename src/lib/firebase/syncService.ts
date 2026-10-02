@@ -63,7 +63,7 @@ export async function saveUserDataToCloud(
                 'Tempo limite ao contatar o Firestore. Verifique se o Cloud Firestore está ativado no Firebase Console.'
               )
             ),
-          6000
+          2500
         )
       );
 
@@ -109,7 +109,7 @@ export async function loadUserDataFromCloud(uid: string): Promise<UserFinancialD
                 'Tempo limite ao buscar dados no Firestore. Verifique se o Cloud Firestore está ativado no Firebase Console.'
               )
             ),
-          6000
+          2500
         )
       );
 
