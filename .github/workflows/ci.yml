@@ -1,0 +1,50 @@
+name: CI - Testes Automatizados (Bun & Playwright)
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    name: Unit & E2E Tests
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Instalar Dependências
+        run: bun install --frozen-lockfile || bun install
+
+      - name: Executar Testes Unitários (Bun Test)
+        run: bun test tests/unit
+
+      - name: Instalar Navegadores do Playwright
+        run: bunx playwright install --with-deps chromium
+
+      - name: Compilar Aplicação Next.js
+        run: bun run build
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY || 'dummy_api_key' }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID || 'dummy_project' }}
+
+      - name: Executar Testes E2E (Playwright)
+        run: bunx playwright test
+
+      - name: Salvar Relatório e Evidências do Playwright em caso de falha
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-failure-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
