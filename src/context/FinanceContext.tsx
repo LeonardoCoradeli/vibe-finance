@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useMemo } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Transaction,
   BudgetLimit,
@@ -10,6 +10,8 @@ import {
   WalletSource,
   validateWalletCompatibility,
 } from '@/types/finance';
+import { useAuth } from '@/lib/firebase/authContext';
+import { loadUserDataFromCloud, saveUserDataToCloud } from '@/lib/firebase/syncService';
 
 interface FinanceContextType {
   transactions: Transaction[];
@@ -32,11 +34,13 @@ interface FinanceContextType {
   deleteGoal: (id: string) => void;
   resetData: () => void;
   loadDemoData: () => void;
+  isSyncing: boolean;
+  syncToCloudNow: () => Promise<{ success: boolean; error?: string }>;
 }
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
-const INITIAL_DEMO_TRANSACTIONS: Transaction[] = [
+const DEMO_TRANSACTIONS: Transaction[] = [
   {
     id: 'tx-1',
     description: 'Salário Mensal Líquido',
@@ -69,16 +73,6 @@ const INITIAL_DEMO_TRANSACTIONS: Transaction[] = [
   },
   {
     id: 'tx-4',
-    description: 'Energia Elétrica (Enel)',
-    amount: 185.4,
-    type: 'expense',
-    category: 'moradia_contas',
-    wallet: 'LIVRE',
-    date: '2026-10-07',
-    status: 'completed',
-  },
-  {
-    id: 'tx-5',
     description: 'Supermercado Mensal Pão de Açúcar',
     amount: 640.8,
     type: 'expense',
@@ -87,69 +81,15 @@ const INITIAL_DEMO_TRANSACTIONS: Transaction[] = [
     date: '2026-10-08',
     status: 'completed',
   },
-  {
-    id: 'tx-6',
-    description: 'Almoço de Trabalho com Colegas',
-    amount: 62.0,
-    type: 'expense',
-    category: 'restaurante_refeicao',
-    wallet: 'BENEFICIO_VR_VA',
-    date: '2026-10-10',
-    status: 'completed',
-  },
-  {
-    id: 'tx-7',
-    description: 'Combustível Posto Shell',
-    amount: 210.0,
-    type: 'expense',
-    category: 'transporte',
-    wallet: 'LIVRE',
-    date: '2026-10-12',
-    status: 'completed',
-  },
-  {
-    id: 'tx-8',
-    description: 'Farmácia Drogasil (Vitaminas & Cuidados)',
-    amount: 135.5,
-    type: 'expense',
-    category: 'saude',
-    wallet: 'LIVRE',
-    date: '2026-10-14',
-    status: 'completed',
-  },
-  {
-    id: 'tx-9',
-    description: 'Cinema & Jantar Final de Semana',
-    amount: 180.0,
-    type: 'expense',
-    category: 'lazer',
-    wallet: 'LIVRE',
-    date: '2026-10-16',
-    status: 'completed',
-  },
-  {
-    id: 'tx-10',
-    description: 'Aporte Reserva de Oportunidade',
-    amount: 800.0,
-    type: 'expense',
-    category: 'investimentos',
-    wallet: 'LIVRE',
-    date: '2026-10-18',
-    status: 'completed',
-  },
 ];
 
-const INITIAL_BUDGETS: BudgetLimit[] = [
+const DEMO_BUDGETS: BudgetLimit[] = [
   { category: 'moradia_contas', monthlyLimit: 2600.0 },
   { category: 'alimentacao_mercado', monthlyLimit: 900.0 },
-  { category: 'restaurante_refeicao', monthlyLimit: 400.0 },
-  { category: 'transporte', monthlyLimit: 500.0 },
   { category: 'lazer', monthlyLimit: 600.0 },
-  { category: 'saude', monthlyLimit: 300.0 },
-  { category: 'investimentos', monthlyLimit: 1500.0 },
 ];
 
-const INITIAL_GOALS: FinancialGoal[] = [
+const DEMO_GOALS: FinancialGoal[] = [
   {
     id: 'goal-1',
     title: 'Reserva de Emergência (6 Meses)',
@@ -159,22 +99,95 @@ const INITIAL_GOALS: FinancialGoal[] = [
     monthlyTarget: 1000.0,
     targetWallet: 'RESERVA_EMERGENCIA',
   },
-  {
-    id: 'goal-2',
-    title: 'Viagem de Férias Fim de Ano',
-    targetAmount: 5000.0,
-    currentAmount: 2200.0,
-    deadline: '2026-12-15',
-    monthlyTarget: 600.0,
-    targetWallet: 'LIVRE',
-  },
 ];
 
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
-  const [transactions, setTransactions] = useState<Transaction[]>(INITIAL_DEMO_TRANSACTIONS);
-  const [budgets, setBudgets] = useState<BudgetLimit[]>(INITIAL_BUDGETS);
-  const [goals, setGoals] = useState<FinancialGoal[]>(INITIAL_GOALS);
+  const { user } = useAuth();
+
+  // Inicia 100% LIMPO por padrão (Zero State)
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [budgets, setBudgets] = useState<BudgetLimit[]>([]);
+  const [goals, setGoals] = useState<FinancialGoal[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>('2026-10');
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  // Sincronização automática quando o usuário faz login com conta Google / Firebase
+  useEffect(() => {
+    let isMounted = true;
+
+    async function handleUserSync() {
+      if (user?.uid) {
+        setIsSyncing(true);
+        try {
+          const cloudData = await loadUserDataFromCloud(user.uid);
+          if (isMounted && cloudData) {
+            if (cloudData.transactions && cloudData.transactions.length > 0) {
+              setTransactions(cloudData.transactions);
+            }
+            if (cloudData.budgets && cloudData.budgets.length > 0) {
+              setBudgets(cloudData.budgets);
+            }
+            if (cloudData.goals && cloudData.goals.length > 0) {
+              setGoals(cloudData.goals);
+            }
+          } else if (isMounted && transactions.length > 0) {
+            // Se o usuário já tinha dados em memória ao logar e a nuvem está vazia, persiste na nuvem
+            await saveUserDataToCloud(user.uid, {
+              transactions,
+              budgets,
+              goals,
+            });
+          }
+        } catch (error) {
+          console.error('Erro na sincronização com nuvem:', error);
+        } finally {
+          if (isMounted) setIsSyncing(false);
+        }
+      } else {
+        // Ao deslogar (voltar ao Modo Convidado), reinicia a memória no Zero State limpo
+        if (isMounted) {
+          setTransactions([]);
+          setBudgets([]);
+          setGoals([]);
+        }
+      }
+    }
+
+    handleUserSync();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
+
+  // Função para salvar imediatamente na nuvem
+  const syncToCloudNow = useCallback(async () => {
+    if (!user?.uid) {
+      return { success: false, error: 'Usuário não conectado ao Firebase.' };
+    }
+    setIsSyncing(true);
+    const res = await saveUserDataToCloud(user.uid, {
+      transactions,
+      budgets,
+      goals,
+    });
+    setIsSyncing(false);
+    return res;
+  }, [user, transactions, budgets, goals]);
+
+  // Salvar em nuvem automaticamente em caso de mutação se usuário estiver logado
+  const triggerBackgroundSave = useCallback(
+    (newTx: Transaction[], newBudgets: BudgetLimit[], newGoals: FinancialGoal[]) => {
+      if (user?.uid) {
+        saveUserDataToCloud(user.uid, {
+          transactions: newTx,
+          budgets: newBudgets,
+          goals: newGoals,
+        }).catch((err) => console.warn('Erro ao salvar em segundo plano:', err));
+      }
+    },
+    [user]
+  );
 
   // Cálculo de saldos acumulados globais segregados por bolsão
   const balances: WalletBalances = useMemo(() => {
@@ -247,7 +260,6 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const netSavings = monthlyIncome - monthlyExpense;
 
   const addTransaction = (tx: Omit<Transaction, 'id'>) => {
-    // Validar regra de não-contaminação se for despesa
     if (tx.type === 'expense') {
       const validation = validateWalletCompatibility(tx.category, tx.wallet);
       if (!validation.valid) {
@@ -260,7 +272,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       id: `tx-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     };
 
-    setTransactions((prev) => [newTx, ...prev]);
+    const updated = [newTx, ...transactions];
+    setTransactions(updated);
+    triggerBackgroundSave(updated, budgets, goals);
     return { success: true, transaction: newTx };
   };
 
@@ -278,19 +292,23 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    setTransactions((prev) => prev.map((t) => (t.id === id ? merged : t)));
+    const updated = transactions.map((t) => (t.id === id ? merged : t));
+    setTransactions(updated);
+    triggerBackgroundSave(updated, budgets, goals);
     return { success: true };
   };
 
   const deleteTransaction = (id: string) => {
-    setTransactions((prev) => prev.filter((t) => t.id !== id));
+    const updated = transactions.filter((t) => t.id !== id);
+    setTransactions(updated);
+    triggerBackgroundSave(updated, budgets, goals);
   };
 
   const setBudgetLimit = (category: TransactionCategory, monthlyLimit: number) => {
-    setBudgets((prev) => {
-      const filtered = prev.filter((b) => b.category !== category);
-      return [...filtered, { category, monthlyLimit }];
-    });
+    const filtered = budgets.filter((b) => b.category !== category);
+    const updated = [...filtered, { category, monthlyLimit }];
+    setBudgets(updated);
+    triggerBackgroundSave(transactions, updated, goals);
   };
 
   const addGoal = (goal: Omit<FinancialGoal, 'id'>) => {
@@ -298,28 +316,36 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       ...goal,
       id: `goal-${Date.now()}`,
     };
-    setGoals((prev) => [...prev, newGoal]);
+    const updated = [...goals, newGoal];
+    setGoals(updated);
+    triggerBackgroundSave(transactions, budgets, updated);
     return newGoal;
   };
 
   const updateGoal = (id: string, goal: Partial<FinancialGoal>) => {
-    setGoals((prev) => prev.map((g) => (g.id === id ? { ...g, ...goal } : g)));
+    const updated = goals.map((g) => (g.id === id ? { ...g, ...goal } : g));
+    setGoals(updated);
+    triggerBackgroundSave(transactions, budgets, updated);
   };
 
   const deleteGoal = (id: string) => {
-    setGoals((prev) => prev.filter((g) => g.id !== id));
+    const updated = goals.filter((g) => g.id !== id);
+    setGoals(updated);
+    triggerBackgroundSave(transactions, budgets, updated);
   };
 
   const resetData = () => {
     setTransactions([]);
     setBudgets([]);
     setGoals([]);
+    triggerBackgroundSave([], [], []);
   };
 
   const loadDemoData = () => {
-    setTransactions(INITIAL_DEMO_TRANSACTIONS);
-    setBudgets(INITIAL_BUDGETS);
-    setGoals(INITIAL_GOALS);
+    setTransactions(DEMO_TRANSACTIONS);
+    setBudgets(DEMO_BUDGETS);
+    setGoals(DEMO_GOALS);
+    triggerBackgroundSave(DEMO_TRANSACTIONS, DEMO_BUDGETS, DEMO_GOALS);
   };
 
   return (
@@ -345,6 +371,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         deleteGoal,
         resetData,
         loadDemoData,
+        isSyncing,
+        syncToCloudNow,
       }}
     >
       {children}

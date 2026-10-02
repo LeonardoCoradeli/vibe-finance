@@ -18,7 +18,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "firebase/app": ["./node_modules/firebase/app/dist/esm/index.esm.js"],
+      "firebase/auth": ["./node_modules/firebase/auth/dist/esm/index.esm.js"],
+      "firebase/firestore": ["./node_modules/firebase/firestore/dist/esm/index.esm.js"]
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
