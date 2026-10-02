@@ -27,6 +27,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Se havia uma sessão ativa de QA salva no navegador, restaura-a
+    if (typeof window !== 'undefined') {
+      try {
+        const storedQa = window.sessionStorage.getItem('qa_active_session');
+        if (storedQa) {
+          setUser(JSON.parse(storedQa));
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        console.warn('Erro ao restaurar sessão QA:', e);
+      }
+    }
+
     if (!isFirebaseConfigured || !auth) {
       setLoading(false);
       return;
@@ -60,17 +74,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInWithQAMock = (account = { uid: 'qa-tester-001', email: 'qa.tester@financas.app', displayName: 'QA Tester' }) => {
-    setUser({
+    const qaUser = {
       uid: account.uid,
       email: account.email,
       displayName: account.displayName,
       photoURL: null,
-    });
+    } as any;
+
+    if (typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.setItem('qa_active_session', JSON.stringify(qaUser));
+      } catch (e) {
+        console.warn('Erro ao salvar sessão QA:', e);
+      }
+    }
+
+    setUser(qaUser);
   };
 
   const logout = async () => {
+    if (typeof window !== 'undefined') {
+      try {
+        window.sessionStorage.removeItem('qa_active_session');
+      } catch (e) {
+        console.warn('Erro ao limpar sessão QA:', e);
+      }
+    }
+
     if (auth && isFirebaseConfigured) {
-      await signOut(auth);
+      try {
+        await signOut(auth);
+      } catch {}
     }
     setUser(null);
   };
