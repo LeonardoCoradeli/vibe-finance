@@ -4,9 +4,9 @@ test.describe('Dashboard Financeiro E2E', () => {
   test('deve carregar a página inicial com título, bolsões de saldo e gráficos', async ({ page }) => {
     await page.goto('/');
 
-    // 1. Título do Header
+    // 1. Título do Header e Botão de Perfil (Convidado)
     await expect(page.getByRole('heading', { name: /Gestão Financeira/i })).toBeVisible();
-    await expect(page.getByText('Modo Convidado (Em memória)')).toBeVisible();
+    await expect(page.getByRole('button', { name: /Perfil.*Convidado|Convidado/i })).toBeVisible();
 
     // 2. Os 3 Bolsões Segregados
     await expect(page.getByText('Bolsão Livre')).toBeVisible();

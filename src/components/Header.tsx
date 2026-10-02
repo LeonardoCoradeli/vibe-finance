@@ -58,7 +58,7 @@ export function Header({
   onOpenPDFModal,
   onOpenTransactionModal,
 }: HeaderProps) {
-  const { selectedMonth, setSelectedMonth, resetData, loadDemoData, isSyncing, syncToCloudNow } = useFinance();
+  const { selectedMonth, setSelectedMonth, resetData, loadDemoData } = useFinance();
   const { user, isConfigured, isQaModeEnabled, signInWithGoogle, signInWithQAMock, logout } = useAuth();
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
@@ -118,18 +118,10 @@ export function Header({
       <header className="border-b border-gray-800 bg-[#0d131f]/90 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            {/* Logo & Seletor de Perfis Clicável no Nome */}
+            {/* Logo & Marca (Estático, limpo, sem modo convidado embaixo) */}
             <div className="flex items-center space-x-3 w-full md:w-auto justify-between md:justify-start">
-              <button
-                type="button"
-                onClick={() => {
-                  setAuthErrorMessage(null);
-                  setIsProfileModalOpen(true);
-                }}
-                className="flex items-center space-x-2.5 p-1.5 -m-1.5 rounded-2xl hover:bg-gray-800/60 transition-all text-left group cursor-pointer"
-                title="Clique no nome para gerenciar perfis (Modo Convidado, Google, QA)"
-              >
-                <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white font-bold text-xl group-hover:scale-105 transition-transform">
+              <div className="flex items-center space-x-2.5">
+                <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white font-bold text-xl">
                   ₿
                 </div>
                 <div>
@@ -138,22 +130,9 @@ export function Header({
                     <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                       Pro
                     </span>
-                    <ChevronRight className="w-3.5 h-3.5 text-gray-500 group-hover:text-emerald-400 transition-colors" />
                   </h1>
-                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
-                    {user ? (
-                      <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                        <Cloud className="w-3 h-3" />
-                        {isSyncing ? 'Sincronizando Nuvem...' : `Nuvem: ${user.email?.split('@')[0] || user.displayName}`}
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-amber-400/90 font-medium" title="Dados voláteis em memória">
-                        <HardDrive className="w-3 h-3" /> Modo Convidado (Em memória)
-                      </span>
-                    )}
-                  </div>
                 </div>
-              </button>
+              </div>
 
               {/* Botões de Ação Rápida de Estado (Demo e Limpar) */}
               <div className="flex items-center gap-1.5">
@@ -198,7 +177,7 @@ export function Header({
             </div>
 
             {/* Botões de Ação Principal */}
-            <div className="flex items-center gap-2.5 flex-wrap justify-center w-full md:w-auto">
+            <div className="flex items-center gap-3 flex-wrap justify-center w-full md:w-auto">
               {/* Proposta de Gasto IA & PO */}
               <button
                 onClick={onOpenProposalModal}
@@ -226,53 +205,43 @@ export function Header({
                 Nova Transação
               </button>
 
-              {/* Autenticação Google / QA / Perfis */}
-              {user ? (
-                <div className="flex items-center gap-2 pl-1 border-l border-gray-800">
-                  <button
-                    onClick={() => {
-                      setAuthErrorMessage(null);
-                      setIsProfileModalOpen(true);
-                    }}
-                    className="flex items-center gap-2 px-2 py-1 rounded-xl hover:bg-gray-800/80 transition text-left"
-                    title="Gerenciar perfil e conexões"
-                  >
-                    {user.photoURL ? (
-                      <img
-                        src={user.photoURL}
-                        alt={user.displayName || 'Usuário'}
-                        className="w-7 h-7 rounded-full border border-emerald-500/50"
-                      />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full bg-emerald-600/30 text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-500/40">
-                        <UserIcon className="w-3.5 h-3.5" />
-                      </div>
-                    )}
-                    <span className="text-xs text-gray-300 font-medium hidden sm:inline max-w-[110px] truncate">
-                      {user.displayName || user.email?.split('@')[0]}
-                    </span>
-                  </button>
-                  <button
-                    onClick={logout}
-                    title="Sair da conta"
-                    className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-gray-800 rounded-lg transition"
-                  >
-                    <LogOut className="w-4 h-4" />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    setAuthErrorMessage(null);
-                    setIsProfileModalOpen(true);
-                  }}
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-gray-100 text-gray-900 shadow-md shadow-white/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                  title="Conectar com sua Conta Google ou selecionar Perfil (Salvar na Nuvem)"
-                >
-                  <GoogleIcon className="w-3.5 h-3.5" />
-                  <span>Entrar com Google</span>
-                </button>
-              )}
+              {/* Bolinha de Perfil com Nome Embaixo (Convidado ou Usuário Conectado) */}
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthErrorMessage(null);
+                  setIsProfileModalOpen(true);
+                }}
+                className="flex flex-col items-center justify-center gap-1 px-2.5 py-1 rounded-xl hover:bg-gray-800/70 border border-transparent hover:border-gray-700/80 transition group cursor-pointer shrink-0"
+                title={user ? `Conectado como ${user.email || user.displayName}. Clique para gerenciar o perfil.` : 'Modo Convidado. Clique para conectar seu perfil.'}
+                aria-label={user ? `Perfil: ${user.email || user.displayName}` : 'Perfil: Convidado'}
+              >
+                {/* Bolinha / Avatar */}
+                {user ? (
+                  user.photoURL ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={user.photoURL}
+                      alt={user.displayName || user.email || 'Usuário'}
+                      referrerPolicy="no-referrer"
+                      className="w-7 h-7 rounded-full border-2 border-emerald-500/80 object-cover shadow-sm group-hover:scale-105 transition-transform"
+                    />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-emerald-600/30 text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-500/60 shadow-sm group-hover:scale-105 transition-transform">
+                      <UserIcon className="w-3.5 h-3.5" />
+                    </div>
+                  )
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-gray-800 border border-gray-700 text-gray-400 flex items-center justify-center shadow-inner group-hover:border-emerald-500/50 group-hover:text-emerald-400 group-hover:scale-105 transition-all">
+                    <UserIcon className="w-3.5 h-3.5" />
+                  </div>
+                )}
+
+                {/* Nome embaixo da bolinha */}
+                <span className="text-[10px] font-medium leading-none text-gray-400 group-hover:text-gray-200 transition-colors max-w-[110px] truncate text-center">
+                  {user ? (user.email || user.displayName || 'Conectado') : 'Convidado'}
+                </span>
+              </button>
             </div>
           </div>
         </div>
@@ -390,7 +359,7 @@ export function Header({
                     </span>
                     <button
                       type="button"
-                      onClick={logout}
+                      onClick={handleSwitchToGuest}
                       className="text-xs text-red-400 hover:text-red-300 transition flex items-center gap-1"
                     >
                       <LogOut className="w-3.5 h-3.5" />
@@ -448,7 +417,7 @@ export function Header({
                         <span className="text-[11px] text-purple-300">Simulação de nuvem ativa</span>
                         <button
                           type="button"
-                          onClick={logout}
+                          onClick={handleSwitchToGuest}
                           className="text-xs text-red-400 hover:text-red-300 transition flex items-center gap-1"
                         >
                           <LogOut className="w-3.5 h-3.5" />

@@ -89,7 +89,7 @@ async function main() {
 
   // Screenshot 5: Conexão com a Nuvem e Conta de QA (Modal de Perfis)
   console.log('5. Abrindo modal de perfis e sincronização em nuvem...');
-  await page.getByRole('button', { name: /Gestão Financeira|Entrar com Google/i }).first().click();
+  await page.getByRole('button', { name: /Perfil.*Convidado|Convidado/i }).first().click();
   await page.waitForSelector('text=Perfis de Acesso & Conexão com a Nuvem');
   await page.screenshot({ path: path.join(outputDir, '05-modal-conexao-nuvem-qa.png') });
   console.log('📸 05-modal-conexao-nuvem-qa.png capturado.');
