@@ -1,6 +1,24 @@
 import { chromium } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
+import { spawn, ChildProcess } from 'child_process';
+
+async function isServerRunning(url: string): Promise<boolean> {
+  try {
+    const res = await fetch(url);
+    return res.status < 500;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForServer(url: string, maxAttempts = 30): Promise<void> {
+  for (let i = 0; i < maxAttempts; i++) {
+    if (await isServerRunning(url)) return;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new Error('Servidor não iniciou a tempo na porta 3000.');
+}
 
 async function main() {
   console.log('🚀 Iniciando Validação Visual Automatizada com Playwright...');
@@ -10,14 +28,28 @@ async function main() {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext({
-    viewport: { width: 1280, height: 800 },
-  });
-  const page = await context.newPage();
+  let serverProcess: ChildProcess | null = null;
+  const serverUrl = 'http://localhost:3000';
+
+  if (!(await isServerRunning(serverUrl))) {
+    console.log('Iniciando servidor de produção local em http://localhost:3000...');
+    serverProcess = spawn('bun', ['run', 'start', '--', '-p', '3000'], {
+      shell: true,
+      stdio: 'ignore',
+    });
+    await waitForServer(serverUrl);
+  }
+
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 800 },
+    });
+    const page = await context.newPage();
 
   console.log('1. Acessando http://localhost:3000...');
-  await page.goto('http://localhost:3000');
+  await page.goto(serverUrl);
   await page.waitForLoadState('networkidle');
 
   // Screenshot 1: Dashboard Inicial
@@ -53,9 +85,24 @@ async function main() {
   await page.waitForSelector('text=Importador de Extrato Bancário em PDF');
   await page.screenshot({ path: path.join(outputDir, '04-modal-extrato-pdf.png') });
   console.log('📸 04-modal-extrato-pdf.png capturado.');
+  await page.goto('http://localhost:3000');
 
-  await browser.close();
-  console.log('✅ Validação visual concluída com sucesso! Todos os screenshots salvos em ./artifacts/screenshots/');
+  // Screenshot 5: Conexão com a Nuvem e Conta de QA
+  console.log('5. Abrindo modal de sincronização em nuvem e QA...');
+  await page.getByRole('button', { name: 'Salvar na Nuvem' }).click();
+  await page.waitForSelector('text=Conexão com a Nuvem');
+  await page.screenshot({ path: path.join(outputDir, '05-modal-conexao-nuvem-qa.png') });
+  console.log('📸 05-modal-conexao-nuvem-qa.png capturado.');
+
+    console.log('✅ Validação visual concluída com sucesso! Todos os screenshots salvos em ./artifacts/screenshots/');
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+    if (serverProcess) {
+      serverProcess.kill();
+    }
+  }
 }
 
 main().catch((err) => {
