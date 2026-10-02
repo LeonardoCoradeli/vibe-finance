@@ -17,6 +17,11 @@ export const isFirebaseConfigured = Boolean(
   firebaseConfig.projectId
 );
 
+export const isQaModeEnabled =
+  process.env.NEXT_PUBLIC_ENABLE_QA_MODE === 'true' ||
+  (process.env.NEXT_PUBLIC_ENABLE_QA_MODE !== 'false' &&
+    (process.env.NODE_ENV === 'test' || Boolean(process.env.CI)));
+
 let app: FirebaseApp | undefined;
 let auth: Auth | undefined;
 let db: Firestore | undefined;
