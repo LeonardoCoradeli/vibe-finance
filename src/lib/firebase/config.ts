@@ -22,12 +22,18 @@ let auth: Auth | undefined;
 let db: Firestore | undefined;
 let googleProvider: GoogleAuthProvider | undefined;
 
-if (typeof window !== 'undefined' && isFirebaseConfigured) {
-  app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  db = getFirestore(app);
-  googleProvider = new GoogleAuthProvider();
-  googleProvider.setCustomParameters({ prompt: 'select_account' });
+if (isFirebaseConfigured) {
+  try {
+    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+    if (typeof window !== 'undefined') {
+      googleProvider = new GoogleAuthProvider();
+      googleProvider.setCustomParameters({ prompt: 'select_account' });
+    }
+  } catch (e) {
+    console.warn('Aviso na inicialização do Firebase:', e);
+  }
 }
 
 export { app, auth, db, googleProvider };
