@@ -1,11 +1,14 @@
 import { db, isFirebaseConfigured } from './config';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
-import { Transaction, BudgetLimit, FinancialGoal } from '@/types/finance';
+import { Transaction, BudgetLimit, FinancialGoal, Wallet, Category } from '@/types/finance';
 
 export interface UserFinancialData {
   transactions: Transaction[];
   budgets: BudgetLimit[];
   goals: FinancialGoal[];
+  wallets?: Wallet[];
+  categories?: Category[];
+  categoryMappings?: Record<string, string>;
   updatedAt: string;
 }
 
@@ -18,6 +21,9 @@ export async function saveUserDataToCloud(
     transactions: Transaction[];
     budgets: BudgetLimit[];
     goals: FinancialGoal[];
+    wallets?: Wallet[];
+    categories?: Category[];
+    categoryMappings?: Record<string, string>;
   }
 ): Promise<{ success: boolean; error?: string }> {
   // Se for uma conta de QA ou teste, persiste no localStorage do navegador ou Map em memória
@@ -26,6 +32,9 @@ export async function saveUserDataToCloud(
       transactions: data.transactions,
       budgets: data.budgets,
       goals: data.goals,
+      wallets: data.wallets,
+      categories: data.categories,
+      categoryMappings: data.categoryMappings,
       updatedAt: new Date().toISOString(),
     };
 
@@ -44,16 +53,17 @@ export async function saveUserDataToCloud(
   if (isFirebaseConfigured && db) {
     try {
       const userDocRef = doc(db, 'users', uid);
-      const savePromise = setDoc(
-        userDocRef,
-        {
-          transactions: data.transactions,
-          budgets: data.budgets,
-          goals: data.goals,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true }
-      );
+      const savePayload: any = {
+        transactions: data.transactions,
+        budgets: data.budgets,
+        goals: data.goals,
+        updatedAt: new Date().toISOString(),
+      };
+      if (data.wallets) savePayload.wallets = data.wallets;
+      if (data.categories) savePayload.categories = data.categories;
+      if (data.categoryMappings) savePayload.categoryMappings = data.categoryMappings;
+
+      const savePromise = setDoc(userDocRef, savePayload, { merge: true });
 
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(

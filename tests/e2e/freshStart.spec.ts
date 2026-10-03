@@ -28,7 +28,7 @@ test.describe('Início do Zero (Zero State) e Fluxo Manual Passo a Passo E2E', (
     await page.getByRole('button', { name: 'Receita (Entrada)' }).click();
     await page.getByPlaceholder('Ex: Supermercado, Aluguel, Salário').fill('Crédito Vale Refeição QA');
     await page.getByPlaceholder('0,00').fill('1000');
-    await page.locator('select').first().selectOption('alimentacao_mercado');
+    await page.locator('select').first().selectOption('alimentacao');
     await page.locator('select').nth(1).selectOption('BENEFICIO_VR_VA');
     await page.getByRole('button', { name: 'Confirmar Lançamento' }).click();
 
@@ -41,7 +41,7 @@ test.describe('Início do Zero (Zero State) e Fluxo Manual Passo a Passo E2E', (
     await page.getByRole('button', { name: 'Despesa (Saída)' }).click();
     await page.getByPlaceholder('Ex: Supermercado, Aluguel, Salário').fill('Boleto Energia Enel');
     await page.getByPlaceholder('0,00').fill('250');
-    await page.locator('select').first().selectOption('moradia_contas');
+    await page.locator('select').first().selectOption('contas');
     await page.locator('select').nth(1).selectOption('LIVRE');
     await page.getByRole('button', { name: 'Confirmar Lançamento' }).click();
 

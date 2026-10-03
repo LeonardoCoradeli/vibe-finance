@@ -8,7 +8,7 @@ interface CategorizationRule {
 }
 
 const RULES: CategorizationRule[] = [
-  // Alimentação / VR
+  // Alimentação / VR (Supermercados, Lanches, Restaurantes, Feira)
   {
     keywords: [
       'IFOOD',
@@ -27,14 +27,6 @@ const RULES: CategorizationRule[] = [
       'QUITANDA',
       'HIROTA',
       'SAO VICENTE',
-    ],
-    category: 'alimentacao_mercado',
-    wallet: 'BENEFICIO_VR_VA',
-    type: 'expense',
-  },
-  // Restaurante / Refeição
-  {
-    keywords: [
       'RESTAURANTE',
       'LANCHES',
       'BURGER',
@@ -51,11 +43,26 @@ const RULES: CategorizationRule[] = [
       'GIRAFAS',
       'SPOLETO',
     ],
-    category: 'restaurante_refeicao',
+    category: 'alimentacao',
     wallet: 'BENEFICIO_VR_VA',
     type: 'expense',
   },
-  // Moradia & Contas (LIVRE)
+  // Moradia (Aluguel, Condomínio, IPTU)
+  {
+    keywords: [
+      'CONDOMINIO',
+      'ALUGUEL',
+      'IPTU',
+      'QUINTA ANDAR',
+      'QUINTO ANDAR',
+      'LOFT',
+      'IMOBILIARIA',
+    ],
+    category: 'moradia',
+    wallet: 'LIVRE',
+    type: 'expense',
+  },
+  // Contas & Consumo (Luz, Água, Internet, Gás)
   {
     keywords: [
       'ENEL',
@@ -69,17 +76,14 @@ const RULES: CategorizationRule[] = [
       'TIM',
       'OI ',
       'NET ',
-      'CONDOMINIO',
-      'ALUGUEL',
-      'IPTU',
       'LUZ',
       'AGUA',
       'GAS',
       'COMGAS',
-      'QUINTA ANDAR',
-      'LOFT',
+      'ENERGIA',
+      'BOLETO',
     ],
-    category: 'moradia_contas',
+    category: 'contas',
     wallet: 'LIVRE',
     type: 'expense',
   },
@@ -210,7 +214,11 @@ const INCOME_KEYWORDS = [
   'ESTORNO',
 ];
 
-export function categorizeTransactionLine(description: string, indicatedType?: TransactionType): {
+export function categorizeTransactionLine(
+  description: string,
+  indicatedType?: TransactionType,
+  customMappings?: Record<string, string>
+): {
   category: TransactionCategory;
   wallet: WalletSource;
   type: TransactionType;
@@ -218,15 +226,36 @@ export function categorizeTransactionLine(description: string, indicatedType?: T
 } {
   const upper = description.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
+  // 0. Checar se usuário possui mapeamento customizado memorizado
+  if (customMappings) {
+    for (const [kw, mappedCat] of Object.entries(customMappings)) {
+      if (upper.includes(kw.toUpperCase())) {
+        return {
+          category: mappedCat,
+          wallet: 'LIVRE',
+          type: indicatedType || 'expense',
+          confidence: 'alta',
+        };
+      }
+    }
+  }
+
   // 1. Verificar se é Entrada (Income)
   const isIncome =
     indicatedType === 'income' || INCOME_KEYWORDS.some((kw) => upper.includes(kw));
 
   if (isIncome) {
     // Checar se é crédito específico de benefício VR
-    if (upper.includes('VALE REFEICAO') || upper.includes('VR') || upper.includes('ALIMENTACAO') || upper.includes('SODEXO') || upper.includes('ALELO') || upper.includes('TICKET')) {
+    if (
+      upper.includes('VALE REFEICAO') ||
+      upper.includes('VR') ||
+      upper.includes('ALIMENTACAO') ||
+      upper.includes('SODEXO') ||
+      upper.includes('ALELO') ||
+      upper.includes('TICKET')
+    ) {
       return {
-        category: 'alimentacao_mercado',
+        category: 'alimentacao',
         wallet: 'BENEFICIO_VR_VA',
         type: 'income',
         confidence: 'alta',
@@ -234,7 +263,7 @@ export function categorizeTransactionLine(description: string, indicatedType?: T
     }
 
     return {
-      category: 'outros',
+      category: 'contas',
       wallet: 'LIVRE',
       type: 'income',
       confidence: 'alta',
@@ -257,7 +286,7 @@ export function categorizeTransactionLine(description: string, indicatedType?: T
 
   // Fallback para despesas genéricas
   return {
-    category: 'outros',
+    category: 'contas',
     wallet: 'LIVRE',
     type: indicatedType || 'expense',
     confidence: 'baixa',

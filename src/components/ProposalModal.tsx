@@ -43,14 +43,22 @@ export function ProposalModal({ isOpen, onClose }: ProposalModalProps) {
     transactions,
     addTransaction,
     selectedMonth,
+    categories,
+    wallets,
   } = useFinance();
 
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState<TransactionCategory>('lazer');
-  const [wallet, setWallet] = useState<WalletSource>('LIVRE');
+  const [category, setCategory] = useState<string>('alimentacao');
+  const [wallet, setWallet] = useState<string>('LIVRE');
   const [loading, setLoading] = useState(false);
   const [report, setReport] = useState<EvaluationReport | null>(null);
+
+  React.useEffect(() => {
+    if (categories.length > 0 && !categories.some((c) => c.id === category)) {
+      setCategory(categories[0].id);
+    }
+  }, [categories]);
 
   if (!isOpen) return null;
 
@@ -81,6 +89,8 @@ export function ProposalModal({ isOpen, onClose }: ProposalModalProps) {
         budgets,
         goals,
         historicalTransactions: transactions,
+        categories,
+        wallets,
       });
       setReport(result);
     } catch (err) {
@@ -166,10 +176,10 @@ export function ProposalModal({ isOpen, onClose }: ProposalModalProps) {
               <label className="block text-xs font-medium text-gray-300 mb-1">Categoria de Gasto</label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as TransactionCategory)}
+                onChange={(e) => setCategory(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-purple-500"
               >
-                {Object.values(CATEGORIES_CONFIG).map((c) => (
+                {categories.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -180,11 +190,11 @@ export function ProposalModal({ isOpen, onClose }: ProposalModalProps) {
               <label className="block text-xs font-medium text-gray-300 mb-1">Bolsão / Fonte</label>
               <select
                 value={wallet}
-                onChange={(e) => setWallet(e.target.value as WalletSource)}
+                onChange={(e) => setWallet(e.target.value)}
                 className="w-full px-3 py-2 text-sm bg-gray-900 border border-gray-800 rounded-xl text-white focus:outline-none focus:border-purple-500"
               >
-                {Object.entries(WALLET_NAMES).map(([key, item]) => (
-                  <option key={key} value={key}>
+                {wallets.filter((w) => !w.isHidden).map((item) => (
+                  <option key={item.id} value={item.id}>
                     {item.name}
                   </option>
                 ))}

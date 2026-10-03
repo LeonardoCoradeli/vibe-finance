@@ -3,6 +3,8 @@ import {
   BudgetLimit,
   FinancialGoal,
   Transaction,
+  Category,
+  Wallet,
 } from '@/types/finance';
 import { ExpenseProposal, EvaluationReport } from './types';
 import { evaluateLinearProgramming } from './linearProgramming';
@@ -16,17 +18,30 @@ export * from './slmEvaluator';
 
 interface FullEvaluationInput {
   proposal: ExpenseProposal;
-  balances: WalletBalances;
+  balances: WalletBalances & Record<string, number>;
   monthlyIncome: number;
   monthlyExpense: number;
   categoryExpenses: Record<string, number>;
   budgets: BudgetLimit[];
   goals: FinancialGoal[];
   historicalTransactions: Transaction[];
+  categories?: Category[];
+  wallets?: Wallet[];
 }
 
 export async function evaluateExpenseProposal(input: FullEvaluationInput): Promise<EvaluationReport> {
-  const { proposal, balances, monthlyIncome, monthlyExpense, categoryExpenses, budgets, goals, historicalTransactions } = input;
+  const {
+    proposal,
+    balances,
+    monthlyIncome,
+    monthlyExpense,
+    categoryExpenses,
+    budgets,
+    goals,
+    historicalTransactions,
+    categories,
+    wallets,
+  } = input;
 
   // 1. Executa Pesquisa Operacional (Determinística)
   const lpResult = evaluateLinearProgramming({
@@ -37,6 +52,8 @@ export async function evaluateExpenseProposal(input: FullEvaluationInput): Promi
     categoryExpenses,
     budgets,
     goals,
+    categories,
+    wallets,
   });
 
   // 2. Executa Detecção Estatística de Anomalias
@@ -58,10 +75,8 @@ export async function evaluateExpenseProposal(input: FullEvaluationInput): Promi
 
   if (!lpResult.viable || slmResult.verdict === 'nao') {
     finalRecommendation = 'REPROVADO';
-  } else if (anomalyResult.risk === 'alto' || slmResult.impactScore >= 50) {
+  } else if (anomalyResult.risk === 'alto') {
     finalRecommendation = 'ALERTA';
-  } else {
-    finalRecommendation = 'APROVADO';
   }
 
   return {

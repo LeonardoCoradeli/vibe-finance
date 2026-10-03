@@ -12,15 +12,15 @@ test.describe('Regra de Não-Contaminação e Transações E2E', () => {
     await page.getByPlaceholder('Ex: Supermercado, Aluguel, Salário').fill('Boleto Internet Fibra');
     await page.getByPlaceholder('0,00').fill('150');
 
-    // Seleciona Categoria "Moradia & Contas"
-    await page.locator('select').first().selectOption('moradia_contas');
+    // Seleciona Categoria "Contas"
+    await page.locator('select').first().selectOption('contas');
 
     // Tenta selecionar o Bolsão "Benefício VR / VA"
     await page.locator('select').nth(1).selectOption('BENEFICIO_VR_VA');
 
     // Deve exibir o aviso de não-contaminação
     await expect(
-      page.getByText('Regra de Não-Contaminação: Benefício VR/VA não pode ser usado para pagar contas e boletos.')
+      page.getByText(/Regra de Não-Contaminação.*Benefício VR\/VA não pode ser usado/i)
     ).toBeVisible();
 
     // Seleciona o Bolsão correto "LIVRE"

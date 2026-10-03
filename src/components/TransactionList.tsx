@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useFinance } from '@/context/FinanceContext';
-import { CATEGORIES_CONFIG, WALLET_NAMES, TransactionType, WalletSource } from '@/types/finance';
+import { TransactionType } from '@/types/finance';
 import { formatCurrency, formatDateBR } from '@/lib/formatters';
 import {
   ListFilter,
@@ -13,11 +13,14 @@ import {
 } from 'lucide-react';
 
 export function TransactionList() {
-  const { monthlyTransactions, deleteTransaction } = useFinance();
+  const { monthlyTransactions, deleteTransaction, wallets, categories } = useFinance();
 
   const [typeFilter, setTypeFilter] = useState<'all' | TransactionType>('all');
-  const [walletFilter, setWalletFilter] = useState<'all' | WalletSource>('all');
+  const [walletFilter, setWalletFilter] = useState<'all' | string>('all');
   const [search, setSearch] = useState('');
+
+  // Filtra bolsões visíveis para a barra de botões
+  const visibleWallets = wallets.filter((w) => !w.isHidden);
 
   const filtered = monthlyTransactions.filter((tx) => {
     if (typeFilter !== 'all' && tx.type !== typeFilter) return false;
@@ -25,8 +28,8 @@ export function TransactionList() {
     if (search.trim()) {
       const q = search.toLowerCase();
       const matchDesc = tx.description.toLowerCase().includes(q);
-      const catConfig = CATEGORIES_CONFIG[tx.category];
-      const matchCat = catConfig && catConfig.name.toLowerCase().includes(q);
+      const catObj = categories.find((c) => c.id === tx.category);
+      const matchCat = catObj && catObj.name.toLowerCase().includes(q);
       if (!matchDesc && !matchCat) return false;
     }
     return true;
@@ -97,10 +100,10 @@ export function TransactionList() {
             </button>
           </div>
 
-          <div className="flex items-center gap-1 bg-gray-950 p-1 rounded-xl border border-gray-800">
+          <div className="flex items-center gap-1 bg-gray-950 p-1 rounded-xl border border-gray-800 overflow-x-auto max-w-full">
             <button
               onClick={() => setWalletFilter('all')}
-              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition ${
+              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition shrink-0 ${
                 walletFilter === 'all'
                   ? 'bg-gray-800 text-white shadow'
                   : 'text-gray-400 hover:text-white'
@@ -108,60 +111,64 @@ export function TransactionList() {
             >
               Todos Bolsões
             </button>
-            <button
-              onClick={() => setWalletFilter('LIVRE')}
-              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition ${
-                walletFilter === 'LIVRE'
-                  ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Livre
-            </button>
-            <button
-              onClick={() => setWalletFilter('BENEFICIO_VR_VA')}
-              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition ${
-                walletFilter === 'BENEFICIO_VR_VA'
-                  ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              VR / VA
-            </button>
-            <button
-              onClick={() => setWalletFilter('RESERVA_EMERGENCIA')}
-              className={`px-2.5 py-1 text-xs rounded-lg font-medium transition ${
-                walletFilter === 'RESERVA_EMERGENCIA'
-                  ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Reserva
-            </button>
+
+            {visibleWallets.map((w) => {
+              const isSelected = walletFilter === w.id;
+              let shortName = w.name;
+              if (w.id === 'LIVRE') shortName = 'Livre';
+              else if (w.id === 'BENEFICIO_VR_VA') shortName = 'VR / VA';
+              else if (w.id === 'RESERVA_EMERGENCIA') shortName = 'Reserva';
+
+              return (
+                <button
+                  key={w.id}
+                  onClick={() => setWalletFilter(w.id)}
+                  className={`px-2.5 py-1 text-xs rounded-lg font-medium transition shrink-0 ${
+                    isSelected
+                      ? 'border shadow'
+                      : 'text-gray-400 hover:text-white'
+                  }`}
+                  style={{
+                    backgroundColor: isSelected ? `${w.color}25` : undefined,
+                    color: isSelected ? w.color : undefined,
+                    borderColor: isSelected ? `${w.color}50` : undefined,
+                  }}
+                >
+                  {shortName}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Lista de Transações */}
         {filtered.length === 0 ? (
-          <div className="py-12 text-center text-sm text-gray-500">
+          <div className="py-12 text-center text-gray-500 text-xs">
             Nenhuma transação encontrada com os filtros selecionados.
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
             {filtered.map((tx) => {
-              const catConfig = CATEGORIES_CONFIG[tx.category];
-              const walletConfig = WALLET_NAMES[tx.wallet];
               const isIncome = tx.type === 'income';
+              const catObj = categories.find((c) => c.id === tx.category);
+              const walletObj = wallets.find((w) => w.id === tx.wallet);
+
+              let walletDisplay = walletObj?.name || tx.wallet;
+              if (tx.wallet === 'BENEFICIO_VR_VA') walletDisplay = 'VR/VA';
+              else if (tx.wallet === 'LIVRE') walletDisplay = 'Livre';
+              else if (tx.wallet === 'RESERVA_EMERGENCIA') walletDisplay = 'Reserva';
 
               return (
                 <div
                   key={tx.id}
-                  className="p-3 bg-gray-950/70 hover:bg-gray-950 border border-gray-800/80 hover:border-gray-700 rounded-2xl flex items-center justify-between gap-3 transition"
+                  className="flex items-center justify-between p-3 rounded-xl bg-gray-950/70 border border-gray-800/80 hover:border-gray-700 transition group"
                 >
                   <div className="flex items-center gap-3">
                     <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                        isIncome ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                      className={`p-2 rounded-xl shrink-0 ${
+                        isIncome
+                          ? 'bg-emerald-500/10 text-emerald-400'
+                          : 'bg-red-500/10 text-red-400'
                       }`}
                     >
                       {isIncome ? (
@@ -179,26 +186,27 @@ export function TransactionList() {
                         <span className="text-[10px] text-gray-500">
                           {formatDateBR(tx.date)}
                         </span>
-                        {catConfig && (
+                        {catObj && (
                           <span
                             className="text-[10px] px-2 py-0.5 rounded-full font-medium"
                             style={{
-                              backgroundColor: `${catConfig.color}20`,
-                              color: catConfig.color,
+                              backgroundColor: `${catObj.color}20`,
+                              color: catObj.color,
                             }}
                           >
-                            {catConfig.name}
+                            {catObj.name}
                           </span>
                         )}
-                        {walletConfig && (
+                        {walletObj && (
                           <span
-                            className={`text-[10px] px-2 py-0.5 rounded-full border ${walletConfig.badgeColor}`}
+                            className="text-[10px] px-2 py-0.5 rounded-full border font-medium"
+                            style={{
+                              backgroundColor: `${walletObj.color}15`,
+                              color: walletObj.color,
+                              borderColor: `${walletObj.color}35`,
+                            }}
                           >
-                            {tx.wallet === 'BENEFICIO_VR_VA'
-                              ? 'VR/VA'
-                              : tx.wallet === 'LIVRE'
-                              ? 'Livre'
-                              : 'Reserva'}
+                            {walletDisplay}
                           </span>
                         )}
                       </div>

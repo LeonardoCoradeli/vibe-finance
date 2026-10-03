@@ -68,9 +68,9 @@ test.describe('Autenticação com Nuvem e Conta QA E2E', () => {
     await page.getByRole('button', { name: 'Despesa (Saída)' }).click();
     await page.getByPlaceholder('Ex: Supermercado, Aluguel, Salário').fill('Conta de Luz QA');
     await page.getByPlaceholder('0,00').fill('250');
-    await page.locator('select').first().selectOption('moradia_contas');
+    await page.locator('select').first().selectOption('contas');
     await page.locator('select').nth(1).selectOption('BENEFICIO_VR_VA');
-    await expect(page.getByText(/Regra de Não-Contaminação/i)).toBeVisible();
+    await expect(page.getByText(/Regra de Não-Contaminação.*Benefício VR\/VA não pode ser usado/i)).toBeVisible();
     await page.getByRole('button', { name: 'Cancelar' }).click();
 
     // 4. Executa recarregamento completo da página (page.reload / F5)

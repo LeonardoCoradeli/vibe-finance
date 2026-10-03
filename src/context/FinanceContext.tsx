@@ -8,6 +8,10 @@ import {
   WalletBalances,
   TransactionCategory,
   WalletSource,
+  Wallet,
+  Category,
+  DEFAULT_WALLETS,
+  DEFAULT_CATEGORIES,
   validateWalletCompatibility,
 } from '@/types/finance';
 import { useAuth } from '@/lib/firebase/authContext';
@@ -17,14 +21,17 @@ interface FinanceContextType {
   transactions: Transaction[];
   budgets: BudgetLimit[];
   goals: FinancialGoal[];
+  wallets: Wallet[];
+  categories: Category[];
+  categoryMappings: Record<string, string>;
   selectedMonth: string; // YYYY-MM
   setSelectedMonth: (month: string) => void;
-  balances: WalletBalances;
+  balances: WalletBalances & Record<string, number>;
   monthlyTransactions: Transaction[];
   monthlyIncome: number;
   monthlyExpense: number;
   netSavings: number;
-  categoryExpenses: Record<TransactionCategory, number>;
+  categoryExpenses: Record<string, number>;
   addTransaction: (tx: Omit<Transaction, 'id'>) => { success: boolean; error?: string; transaction?: Transaction };
   updateTransaction: (id: string, tx: Partial<Transaction>) => { success: boolean; error?: string };
   deleteTransaction: (id: string) => void;
@@ -32,6 +39,14 @@ interface FinanceContextType {
   addGoal: (goal: Omit<FinancialGoal, 'id'>) => FinancialGoal;
   updateGoal: (id: string, goal: Partial<FinancialGoal>) => void;
   deleteGoal: (id: string) => void;
+  addWallet: (wallet: Omit<Wallet, 'id' | 'isFixed'>) => Wallet;
+  updateWallet: (id: string, updates: Partial<Wallet>) => void;
+  deleteWallet: (id: string) => { success: boolean; error?: string };
+  toggleWalletVisibility: (id: string) => void;
+  addCategory: (category: Omit<Category, 'id' | 'isFixed'>) => Category;
+  updateCategory: (id: string, updates: Partial<Category>) => void;
+  deleteCategory: (id: string) => { success: boolean; error?: string };
+  saveCategoryMapping: (keyword: string, categoryId: string) => void;
   resetData: () => void;
   loadDemoData: () => void;
   isSyncing: boolean;
@@ -40,67 +55,6 @@ interface FinanceContextType {
 
 const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
-const DEMO_TRANSACTIONS: Transaction[] = [
-  {
-    id: 'tx-1',
-    description: 'Salário Mensal Líquido',
-    amount: 6800.0,
-    type: 'income',
-    category: 'outros',
-    wallet: 'LIVRE',
-    date: '2026-10-01',
-    status: 'completed',
-  },
-  {
-    id: 'tx-2',
-    description: 'Crédito Vale Refeição / Alimentação (VR/VA)',
-    amount: 1200.0,
-    type: 'income',
-    category: 'alimentacao_mercado',
-    wallet: 'BENEFICIO_VR_VA',
-    date: '2026-10-01',
-    status: 'completed',
-  },
-  {
-    id: 'tx-3',
-    description: 'Aluguel & Condomínio Residencial',
-    amount: 2200.0,
-    type: 'expense',
-    category: 'moradia_contas',
-    wallet: 'LIVRE',
-    date: '2026-10-05',
-    status: 'completed',
-  },
-  {
-    id: 'tx-4',
-    description: 'Supermercado Mensal Pão de Açúcar',
-    amount: 640.8,
-    type: 'expense',
-    category: 'alimentacao_mercado',
-    wallet: 'BENEFICIO_VR_VA',
-    date: '2026-10-08',
-    status: 'completed',
-  },
-];
-
-const DEMO_BUDGETS: BudgetLimit[] = [
-  { category: 'moradia_contas', monthlyLimit: 2600.0 },
-  { category: 'alimentacao_mercado', monthlyLimit: 900.0 },
-  { category: 'lazer', monthlyLimit: 600.0 },
-];
-
-const DEMO_GOALS: FinancialGoal[] = [
-  {
-    id: 'goal-1',
-    title: 'Reserva de Emergência (6 Meses)',
-    targetAmount: 25000.0,
-    currentAmount: 14500.0,
-    deadline: '2026-12-31',
-    monthlyTarget: 1000.0,
-    targetWallet: 'RESERVA_EMERGENCIA',
-  },
-];
-
 export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
 
@@ -108,6 +62,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budgets, setBudgets] = useState<BudgetLimit[]>([]);
   const [goals, setGoals] = useState<FinancialGoal[]>([]);
+  const [wallets, setWallets] = useState<Wallet[]>(DEFAULT_WALLETS);
+  const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
+  const [categoryMappings, setCategoryMappings] = useState<Record<string, string>>({});
   const [selectedMonth, setSelectedMonth] = useState<string>('2026-10');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
@@ -130,12 +87,23 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
             if (cloudData.goals && cloudData.goals.length > 0) {
               setGoals(cloudData.goals);
             }
+            if (cloudData.wallets && cloudData.wallets.length > 0) {
+              setWallets(cloudData.wallets);
+            }
+            if (cloudData.categories && cloudData.categories.length > 0) {
+              setCategories(cloudData.categories);
+            }
+            if (cloudData.categoryMappings) {
+              setCategoryMappings(cloudData.categoryMappings);
+            }
           } else if (isMounted && transactions.length > 0) {
-            // Se o usuário já tinha dados em memória ao logar e a nuvem está vazia, persiste na nuvem
             await saveUserDataToCloud(user.uid, {
               transactions,
               budgets,
               goals,
+              wallets,
+              categories,
+              categoryMappings,
             });
           }
         } catch (error) {
@@ -149,6 +117,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           setTransactions([]);
           setBudgets([]);
           setGoals([]);
+          setWallets(DEFAULT_WALLETS);
+          setCategories(DEFAULT_CATEGORIES);
+          setCategoryMappings({});
         }
       }
     }
@@ -170,53 +141,73 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       transactions,
       budgets,
       goals,
+      wallets,
+      categories,
+      categoryMappings,
     });
     setIsSyncing(false);
     return res;
-  }, [user, transactions, budgets, goals]);
+  }, [user, transactions, budgets, goals, wallets, categories, categoryMappings]);
 
-  // Salvar em nuvem automaticamente em caso de mutação se usuário estiver logado
+  // Salvar em nuvem automaticamente em segundo plano
   const triggerBackgroundSave = useCallback(
-    (newTx: Transaction[], newBudgets: BudgetLimit[], newGoals: FinancialGoal[]) => {
+    (
+      newTx: Transaction[],
+      newBudgets: BudgetLimit[],
+      newGoals: FinancialGoal[],
+      newWallets: Wallet[] = wallets,
+      newCategories: Category[] = categories,
+      newMappings: Record<string, string> = categoryMappings
+    ) => {
       if (user?.uid) {
         saveUserDataToCloud(user.uid, {
           transactions: newTx,
           budgets: newBudgets,
           goals: newGoals,
+          wallets: newWallets,
+          categories: newCategories,
+          categoryMappings: newMappings,
         }).catch((err) => console.warn('Erro ao salvar em segundo plano:', err));
       }
     },
-    [user]
+    [user, wallets, categories, categoryMappings]
   );
 
-  // Cálculo de saldos acumulados globais segregados por bolsão
-  const balances: WalletBalances = useMemo(() => {
-    let livre = 0;
-    let beneficioVrVa = 0;
-    let reserva = 0;
+  // Cálculo de saldos acumulados dinâmicos por bolsão
+  const balances = useMemo(() => {
+    const b: Record<string, number> = {};
+    wallets.forEach((w) => {
+      b[w.id] = 0;
+    });
 
     for (const tx of transactions) {
       const multiplier = tx.type === 'income' ? 1 : -1;
       const value = tx.amount * multiplier;
-
-      if (tx.wallet === 'LIVRE') {
-        livre += value;
-      } else if (tx.wallet === 'BENEFICIO_VR_VA') {
-        beneficioVrVa += value;
-      } else if (tx.wallet === 'RESERVA_EMERGENCIA') {
-        reserva += value;
+      if (b[tx.wallet] === undefined) {
+        b[tx.wallet] = 0;
       }
+      b[tx.wallet] += value;
     }
 
+    const livre = b['LIVRE'] || 0;
+    const beneficioVrVa = b['BENEFICIO_VR_VA'] || 0;
+    const reserva = b['RESERVA_EMERGENCIA'] || 0;
+
+    let total = 0;
+    Object.values(b).forEach((val) => {
+      total += val;
+    });
+
     return {
-      total: livre + beneficioVrVa + reserva,
+      ...b,
+      total,
       livre,
       beneficioVrVa,
       reserva,
       availableForBills: livre,
       availableForFood: livre + beneficioVrVa,
-    };
-  }, [transactions]);
+    } as WalletBalances & Record<string, number>;
+  }, [wallets, transactions]);
 
   // Transações do mês selecionado
   const monthlyTransactions = useMemo(() => {
@@ -227,26 +218,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const { monthlyIncome, monthlyExpense, categoryExpenses } = useMemo(() => {
     let income = 0;
     let expense = 0;
-    const catMap: Record<TransactionCategory, number> = {
-      moradia_contas: 0,
-      alimentacao_mercado: 0,
-      restaurante_refeicao: 0,
-      transporte: 0,
-      saude: 0,
-      lazer: 0,
-      educacao: 0,
-      investimentos: 0,
-      outros: 0,
-    };
+    const catMap: Record<string, number> = {};
 
     for (const tx of monthlyTransactions) {
       if (tx.type === 'income') {
         income += tx.amount;
       } else {
         expense += tx.amount;
-        if (catMap[tx.category] !== undefined) {
-          catMap[tx.category] += tx.amount;
-        }
+        catMap[tx.category] = (catMap[tx.category] || 0) + tx.amount;
       }
     }
 
@@ -261,7 +240,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
   const addTransaction = (tx: Omit<Transaction, 'id'>) => {
     if (tx.type === 'expense') {
-      const validation = validateWalletCompatibility(tx.category, tx.wallet);
+      const validation = validateWalletCompatibility(tx.category, tx.wallet, categories);
       if (!validation.valid) {
         return { success: false, error: validation.reason };
       }
@@ -286,7 +265,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
 
     const merged = { ...existing, ...updatedFields };
     if (merged.type === 'expense') {
-      const validation = validateWalletCompatibility(merged.category, merged.wallet);
+      const validation = validateWalletCompatibility(merged.category, merged.wallet, categories);
       if (!validation.valid) {
         return { success: false, error: validation.reason };
       }
@@ -334,6 +313,126 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
     triggerBackgroundSave(transactions, budgets, updated);
   };
 
+  // Gerenciamento de Bolsões
+  const addWallet = (walletData: Omit<Wallet, 'id' | 'isFixed'>) => {
+    const slug = walletData.name
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '_');
+    const id = `wallet_${slug}_${Date.now().toString(36)}`;
+
+    const newWallet: Wallet = {
+      ...walletData,
+      id,
+      isFixed: false,
+      isHidden: false,
+    };
+
+    const updated = [...wallets, newWallet];
+    setWallets(updated);
+    triggerBackgroundSave(transactions, budgets, goals, updated, categories);
+    return newWallet;
+  };
+
+  const updateWallet = (id: string, updates: Partial<Wallet>) => {
+    const updated = wallets.map((w) => (w.id === id ? { ...w, ...updates } : w));
+    setWallets(updated);
+    triggerBackgroundSave(transactions, budgets, goals, updated, categories);
+  };
+
+  const deleteWallet = (id: string) => {
+    const wallet = wallets.find((w) => w.id === id);
+    if (!wallet) return { success: false, error: 'Bolsão não encontrado.' };
+
+    if (wallet.isFixed) {
+      return {
+        success: false,
+        error: 'Bolsões nativos de fábrica não podem ser excluídos. Você pode ocultá-los visualmente.',
+      };
+    }
+
+    const hasTx = transactions.some((t) => t.wallet === id);
+    if (hasTx) {
+      return {
+        success: false,
+        error: 'Não é possível excluir este bolsão pois existem transações registradas nele. Reatribua ou exclua as transações primeiro.',
+      };
+    }
+
+    const updated = wallets.filter((w) => w.id !== id);
+    setWallets(updated);
+    triggerBackgroundSave(transactions, budgets, goals, updated, categories);
+    return { success: true };
+  };
+
+  const toggleWalletVisibility = (id: string) => {
+    const updated = wallets.map((w) => (w.id === id ? { ...w, isHidden: !w.isHidden } : w));
+    setWallets(updated);
+    triggerBackgroundSave(transactions, budgets, goals, updated, categories);
+  };
+
+  // Gerenciamento de Categorias
+  const addCategory = (categoryData: Omit<Category, 'id' | 'isFixed'>) => {
+    const slug = categoryData.name
+      .toLowerCase()
+      .trim()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '_');
+    const id = `cat_${slug}_${Date.now().toString(36)}`;
+
+    const newCategory: Category = {
+      ...categoryData,
+      id,
+      isFixed: false,
+      blockedWallets: categoryData.blockedWallets || [],
+    };
+
+    const updated = [...categories, newCategory];
+    setCategories(updated);
+    triggerBackgroundSave(transactions, budgets, goals, wallets, updated);
+    return newCategory;
+  };
+
+  const updateCategory = (id: string, updates: Partial<Category>) => {
+    const updated = categories.map((c) => (c.id === id ? { ...c, ...updates } : c));
+    setCategories(updated);
+    triggerBackgroundSave(transactions, budgets, goals, wallets, updated);
+  };
+
+  const deleteCategory = (id: string) => {
+    const category = categories.find((c) => c.id === id);
+    if (!category) return { success: false, error: 'Categoria não encontrada.' };
+
+    if (category.isFixed) {
+      return {
+        success: false,
+        error: 'Categorias de fábrica não podem ser excluídas.',
+      };
+    }
+
+    const hasTx = transactions.some((t) => t.category === id);
+    if (hasTx) {
+      return {
+        success: false,
+        error: 'Não é possível excluir esta categoria pois existem transações vinculadas a ela. Reclassifique ou remova as transações primeiro.',
+      };
+    }
+
+    const updated = categories.filter((c) => c.id !== id);
+    setCategories(updated);
+    triggerBackgroundSave(transactions, budgets, goals, wallets, updated);
+    return { success: true };
+  };
+
+  const saveCategoryMapping = (keyword: string, categoryId: string) => {
+    const updatedMappings = { ...categoryMappings, [keyword.toLowerCase().trim()]: categoryId };
+    setCategoryMappings(updatedMappings);
+    triggerBackgroundSave(transactions, budgets, goals, wallets, categories, updatedMappings);
+  };
+
   const resetData = () => {
     setTransactions([]);
     setBudgets([]);
@@ -342,10 +441,50 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loadDemoData = () => {
-    setTransactions(DEMO_TRANSACTIONS);
-    setBudgets(DEMO_BUDGETS);
-    setGoals(DEMO_GOALS);
-    triggerBackgroundSave(DEMO_TRANSACTIONS, DEMO_BUDGETS, DEMO_GOALS);
+    const demoTx: Transaction[] = [
+      {
+        id: 'tx-1',
+        description: 'Salário Mensal Líquido',
+        amount: 6800.0,
+        type: 'income',
+        category: 'contas',
+        wallet: 'LIVRE',
+        date: '2026-10-01',
+        status: 'completed',
+      },
+      {
+        id: 'tx-2',
+        description: 'Crédito Vale Refeição / Alimentação (VR/VA)',
+        amount: 1200.0,
+        type: 'income',
+        category: 'alimentacao',
+        wallet: 'BENEFICIO_VR_VA',
+        date: '2026-10-01',
+        status: 'completed',
+      },
+      {
+        id: 'tx-3',
+        description: 'Aluguel Residencial',
+        amount: 2200.0,
+        type: 'expense',
+        category: 'moradia',
+        wallet: 'LIVRE',
+        date: '2026-10-05',
+        status: 'completed',
+      },
+      {
+        id: 'tx-4',
+        description: 'Supermercado Mensal',
+        amount: 640.8,
+        type: 'expense',
+        category: 'alimentacao',
+        wallet: 'BENEFICIO_VR_VA',
+        date: '2026-10-08',
+        status: 'completed',
+      },
+    ];
+    setTransactions(demoTx);
+    triggerBackgroundSave(demoTx, budgets, goals);
   };
 
   return (
@@ -354,6 +493,9 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         transactions,
         budgets,
         goals,
+        wallets,
+        categories,
+        categoryMappings,
         selectedMonth,
         setSelectedMonth,
         balances,
@@ -369,6 +511,14 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         addGoal,
         updateGoal,
         deleteGoal,
+        addWallet,
+        updateWallet,
+        deleteWallet,
+        toggleWalletVisibility,
+        addCategory,
+        updateCategory,
+        deleteCategory,
+        saveCategoryMapping,
         resetData,
         loadDemoData,
         isSyncing,

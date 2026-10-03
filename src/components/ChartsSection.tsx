@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import { useFinance } from '@/context/FinanceContext';
-import { CATEGORIES_CONFIG, TransactionCategory } from '@/types/finance';
 import { formatCurrency } from '@/lib/formatters';
 import {
   PieChart,
@@ -20,7 +19,7 @@ import {
 import { PieChart as PieIcon, BarChart3 } from 'lucide-react';
 
 export function ChartsSection() {
-  const { categoryExpenses, monthlyTransactions } = useFinance();
+  const { categoryExpenses, monthlyTransactions, categories, wallets } = useFinance();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -35,7 +34,7 @@ export function ChartsSection() {
   const categoryData = Object.entries(categoryExpenses)
     .filter(([_, value]) => value > 0)
     .map(([catKey, value]) => {
-      const config = CATEGORIES_CONFIG[catKey as TransactionCategory];
+      const config = categories.find((c) => c.id === catKey);
       return {
         name: config ? config.name : catKey,
         value,
@@ -44,15 +43,15 @@ export function ChartsSection() {
     })
     .sort((a, b) => b.value - a.value);
 
-  // Dados para o Gráfico de Fontes/Bolsões (LIVRE vs VR vs RESERVA)
-  const walletStats = {
-    LIVRE: { income: 0, expense: 0 },
-    BENEFICIO_VR_VA: { income: 0, expense: 0 },
-    RESERVA_EMERGENCIA: { income: 0, expense: 0 },
-  };
+  // Dados para o Gráfico de Fontes/Bolsões
+  const visibleWallets = wallets.filter((w) => !w.isHidden);
+  const walletStats: Record<string, { income: number; expense: number }> = {};
+  visibleWallets.forEach((w) => {
+    walletStats[w.id] = { income: 0, expense: 0 };
+  });
 
   for (const tx of monthlyTransactions) {
-    if (tx.wallet in walletStats) {
+    if (walletStats[tx.wallet]) {
       if (tx.type === 'income') {
         walletStats[tx.wallet].income += tx.amount;
       } else {
@@ -61,23 +60,18 @@ export function ChartsSection() {
     }
   }
 
-  const walletBarData = [
-    {
-      name: 'Saldo Livre',
-      Entradas: walletStats.LIVRE.income,
-      Saídas: walletStats.LIVRE.expense,
-    },
-    {
-      name: 'Benefício VR/VA',
-      Entradas: walletStats.BENEFICIO_VR_VA.income,
-      Saídas: walletStats.BENEFICIO_VR_VA.expense,
-    },
-    {
-      name: 'Reserva',
-      Entradas: walletStats.RESERVA_EMERGENCIA.income,
-      Saídas: walletStats.RESERVA_EMERGENCIA.expense,
-    },
-  ];
+  const walletBarData = visibleWallets.map((w) => {
+    let displayName = w.name;
+    if (w.id === 'LIVRE') displayName = 'Saldo Livre';
+    else if (w.id === 'BENEFICIO_VR_VA') displayName = 'Benefício VR/VA';
+    else if (w.id === 'RESERVA_EMERGENCIA') displayName = 'Reserva';
+
+    return {
+      name: displayName,
+      Entradas: walletStats[w.id]?.income || 0,
+      Saídas: walletStats[w.id]?.expense || 0,
+    };
+  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

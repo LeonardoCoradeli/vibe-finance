@@ -5,29 +5,39 @@ import {
   validateWalletCompatibility,
   WALLET_NAMES,
   CATEGORIES_CONFIG,
+  Category,
+  Wallet,
 } from '@/types/finance';
 import { ExpenseProposal, LinearProgrammingResult } from './types';
 
 interface LPInput {
   proposal: ExpenseProposal;
-  balances: WalletBalances;
+  balances: WalletBalances & Record<string, number>;
   monthlyIncome: number;
   monthlyExpense: number;
   categoryExpenses: Record<string, number>;
   budgets: BudgetLimit[];
   goals: FinancialGoal[];
+  categories?: Category[];
+  wallets?: Wallet[];
 }
 
 export function evaluateLinearProgramming(input: LPInput): LinearProgrammingResult {
-  const { proposal, balances, monthlyIncome, monthlyExpense, categoryExpenses, budgets, goals } = input;
+  const { proposal, balances, monthlyIncome, monthlyExpense, categoryExpenses, budgets, goals, categories, wallets } = input;
   const violations: string[] = [];
 
-  // 1. Verificação de Compatibilidade de Fonte
-  const comp = validateWalletCompatibility(proposal.category, proposal.wallet);
+  const walletObj = wallets?.find((w) => w.id === proposal.wallet);
+  const walletName = walletObj?.name || WALLET_NAMES[proposal.wallet]?.name || proposal.wallet;
+
+  const catObj = categories?.find((c) => c.id === proposal.category);
+  const catName = catObj?.name || CATEGORIES_CONFIG[proposal.category]?.name || proposal.category;
+
+  // 1. Verificação de Compatibilidade de Fonte (Blocklist)
+  const comp = validateWalletCompatibility(proposal.category, proposal.wallet, categories);
   const compatibilityCheck = {
     ok: comp.valid,
     message: comp.valid
-      ? `A fonte "${WALLET_NAMES[proposal.wallet].name}" é compatível com "${CATEGORIES_CONFIG[proposal.category].name}".`
+      ? `A fonte "${walletName}" é compatível com "${catName}".`
       : comp.reason || 'Incompatibilidade entre fonte e categoria.',
   };
   if (!comp.valid) {
@@ -36,7 +46,9 @@ export function evaluateLinearProgramming(input: LPInput): LinearProgrammingResu
 
   // 2. Verificação de Saldo da Fonte (Solvência)
   let currentWalletBalance = 0;
-  if (proposal.wallet === 'LIVRE') {
+  if (proposal.wallet in balances) {
+    currentWalletBalance = (balances as any)[proposal.wallet] || 0;
+  } else if (proposal.wallet === 'LIVRE') {
     currentWalletBalance = balances.livre;
   } else if (proposal.wallet === 'BENEFICIO_VR_VA') {
     currentWalletBalance = balances.beneficioVrVa;
@@ -52,7 +64,7 @@ export function evaluateLinearProgramming(input: LPInput): LinearProgrammingResu
     remainingBalance: remainingWalletBalance,
     message: isBalanceSufficient
       ? `Saldo suficiente na fonte: restará R$ ${remainingWalletBalance.toFixed(2)}.`
-      : `Saldo insuficiente na fonte: faltam R$ ${Math.abs(remainingWalletBalance).toFixed(2)} no bolsão ${WALLET_NAMES[proposal.wallet].name}.`,
+      : `Saldo insuficiente na fonte: faltam R$ ${Math.abs(remainingWalletBalance).toFixed(2)} no bolsão ${walletName}.`,
   };
   if (!isBalanceSufficient) {
     violations.push(balanceCheck.message);
@@ -98,14 +110,14 @@ export function evaluateLinearProgramming(input: LPInput): LinearProgrammingResu
     targetSavings: targetMonthlySavings,
     projectedSavings: projectedNetSavings,
     message: isSavingsGoalMet
-      ? `Meta de economia mensal preservada (Meta: R$ ${targetMonthlySavings.toFixed(2)}, Projetado: R$ ${projectedNetSavings.toFixed(2)}).`
-      : `Compromete a meta de economia mensal em R$ ${savingsGap.toFixed(2)} (Meta: R$ ${targetMonthlySavings.toFixed(2)}, Saldo líquido restante: R$ ${projectedNetSavings.toFixed(2)}).`,
+      ? `Mantém a meta de poupança mensal de R$ ${targetMonthlySavings.toFixed(2)} intacta.`
+      : `Compromete a meta de poupança mensal em R$ ${savingsGap.toFixed(2)}.`,
   };
-
-  if (!isSavingsGoalMet && targetMonthlySavings > 0) {
+  if (!isSavingsGoalMet) {
     violations.push(savingsGoalCheck.message);
   }
 
+  // Decisão Global de Viabilidade Matemática
   const viable = violations.length === 0;
 
   return {
@@ -113,7 +125,7 @@ export function evaluateLinearProgramming(input: LPInput): LinearProgrammingResu
     violations,
     remainingWalletBalance,
     categoryRemainingMargin,
-    savingsImpact: proposal.amount,
+    savingsImpact: projectedNetSavings,
     details: {
       compatibilityCheck,
       balanceCheck,

@@ -9,9 +9,9 @@ test.describe('Dashboard Financeiro E2E', () => {
     await expect(page.getByRole('button', { name: /Perfil.*Convidado|Convidado/i })).toBeVisible();
 
     // 2. Os 3 Bolsões Segregados
-    await expect(page.getByText('Bolsão Livre')).toBeVisible();
-    await expect(page.getByText('Benefício VR / VA')).toBeVisible();
-    await expect(page.getByText('Reserva de Emergência', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Saldo Livre/i).first()).toBeVisible();
+    await expect(page.getByText(/Benefício VR \/ VA/i).first()).toBeVisible();
+    await expect(page.getByText(/Reserva de Emergência/i).first()).toBeVisible();
 
     // 3. Métricas Mensais
     await expect(page.getByText('Entradas do Mês')).toBeVisible();

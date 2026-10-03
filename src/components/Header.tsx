@@ -14,8 +14,6 @@ import {
   User as UserIcon,
   Cloud,
   HardDrive,
-  RefreshCw,
-  Trash2,
   CheckCircle2,
   AlertCircle,
   X,
@@ -58,7 +56,7 @@ export function Header({
   onOpenPDFModal,
   onOpenTransactionModal,
 }: HeaderProps) {
-  const { selectedMonth, setSelectedMonth, resetData, loadDemoData } = useFinance();
+  const { selectedMonth, setSelectedMonth } = useFinance();
   const { user, isConfigured, isQaModeEnabled, signInWithGoogle, signInWithQAMock, logout } = useAuth();
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
@@ -132,26 +130,6 @@ export function Header({
                     </span>
                   </h1>
                 </div>
-              </div>
-
-              {/* Botões de Ação Rápida de Estado (Demo e Limpar) */}
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={loadDemoData}
-                  title="Carregar Dados de Exemplo"
-                  className="px-2 py-1 text-[11px] font-medium text-gray-400 hover:text-white bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-lg transition flex items-center gap-1"
-                >
-                  <RefreshCw className="w-3 h-3 text-emerald-400" />
-                  <span className="hidden sm:inline">Exemplo</span>
-                </button>
-                <button
-                  onClick={resetData}
-                  title="Limpar tudo e recomeçar do zero"
-                  className="px-2 py-1 text-[11px] font-medium text-gray-400 hover:text-red-400 bg-gray-900 border border-gray-800 hover:border-gray-700 rounded-lg transition flex items-center gap-1"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span className="hidden sm:inline">Zerar</span>
-                </button>
               </div>
             </div>
 

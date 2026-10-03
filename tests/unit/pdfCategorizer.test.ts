@@ -4,14 +4,14 @@ import { categorizeTransactionLine } from '@/lib/pdf/categorizer';
 describe('Autocategorizador Heurístico de Extratos em PDF', () => {
   it('deve categorizar iFood como Alimentação e bolsão BENEFICIO_VR_VA', () => {
     const res = categorizeTransactionLine('PG *IFOOD BRASIL SAO PAULO');
-    expect(res.category).toBe('alimentacao_mercado');
+    expect(res.category).toBe('alimentacao');
     expect(res.wallet).toBe('BENEFICIO_VR_VA');
     expect(res.type).toBe('expense');
   });
 
-  it('deve categorizar Enel / Luz como Moradia/Contas e bolsão LIVRE', () => {
+  it('deve categorizar Enel / Luz como Contas e bolsão LIVRE', () => {
     const res = categorizeTransactionLine('DEBITO AUTOMATICO ENEL DISTRIBUICAO');
-    expect(res.category).toBe('moradia_contas');
+    expect(res.category).toBe('contas');
     expect(res.wallet).toBe('LIVRE');
     expect(res.type).toBe('expense');
   });
