@@ -20,6 +20,7 @@ import {
   Users,
   ShieldAlert,
   ArrowRightLeft,
+  ExternalLink,
 } from 'lucide-react';
 
 function GoogleIcon({ className = 'w-4 h-4' }: { className?: string }) {
@@ -412,9 +413,22 @@ export function Header({
             {authErrorMessage && (
               <div className="mt-4 p-3.5 bg-amber-500/10 border border-amber-500/30 rounded-2xl text-xs text-amber-200 flex items-start gap-2.5">
                 <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                <div className="space-y-1 text-left">
+                <div className="space-y-1.5 text-left w-full">
                   <p className="font-semibold text-amber-300">Atenção na Autenticação</p>
-                  <p className="leading-relaxed text-[11px] text-amber-200/90">{authErrorMessage}</p>
+                  <p className="leading-relaxed text-[11px] text-amber-200/90 whitespace-pre-line">{authErrorMessage}</p>
+                  {authErrorMessage.includes('Firebase Console') && (
+                    <div className="pt-1">
+                      <a
+                        href="https://console.firebase.google.com/project/teste-dc3ae/authentication/providers"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-semibold border border-amber-500/30 transition shadow-sm"
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                        <span>Abrir Firebase Console (Ativar Provedor Google)</span>
+                      </a>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

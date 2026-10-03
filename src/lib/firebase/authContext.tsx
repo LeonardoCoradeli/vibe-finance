@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import { User, onAuthStateChanged, signInWithPopup, signOut, GoogleAuthProvider } from 'firebase/auth';
 import { auth, googleProvider, isFirebaseConfigured, isQaModeEnabled } from './config';
 
 interface AuthContextType {
@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInWithGoogle = async () => {
-    if (!isFirebaseConfigured || !auth || !googleProvider) {
+    if (!isFirebaseConfigured || !auth) {
       return {
         success: false,
         error:
@@ -66,10 +66,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     try {
-      await signInWithPopup(auth, googleProvider);
+      const provider = googleProvider || new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      await signInWithPopup(auth, provider);
       return { success: true };
     } catch (error: any) {
       const code = error?.code || '';
+      if (code === 'auth/configuration-not-found') {
+        return {
+          success: false,
+          error:
+            'O provedor de Login Google ou o serviço Firebase Authentication ainda não foram ativados no Firebase Console (projeto teste-dc3ae). Acesse o Console > Authentication > Sign-in method e ative o "Google" (selecionando um e-mail de suporte). Enquanto isso, você pode entrar utilizando a Conta de QA para testar todas as funcionalidades!',
+        };
+      }
       if (code === 'auth/operation-not-allowed') {
         return {
           success: false,
@@ -93,7 +102,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return {
           success: false,
           error:
-            'Este domínio não está autorizado no Firebase Authentication. Acesse Authentication > Settings > Authorized domains e adicione o domínio atual.',
+            'Este domínio (ex: localhost ou Vercel) não está autorizado no Firebase Authentication. Acesse Authentication > Settings > Authorized domains no Firebase Console e adicione este domínio.',
         };
       }
       return {
