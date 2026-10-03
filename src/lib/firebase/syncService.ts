@@ -80,9 +80,25 @@ export async function saveUserDataToCloud(
       await Promise.race([savePromise, timeoutPromise]);
       return { success: true };
     } catch (error: any) {
+      const msg = error?.message || '';
+      let friendlyError = msg;
+      if (
+        msg.includes('PERMISSION_DENIED') ||
+        msg.includes('not been used in project') ||
+        msg.includes('disabled')
+      ) {
+        friendlyError =
+          'O Cloud Firestore ainda não foi ativado no seu projeto Firebase (teste-dc3ae). Acesse o Firebase Console > Firestore Database e clique em "Criar banco de dados".';
+      } else if (msg.includes('Missing or insufficient permissions')) {
+        friendlyError =
+          'Permissão negada pelas Regras do Firestore. No Firebase Console > Firestore Database > Regras, permita leitura e escrita para usuários autenticados.';
+      } else if (msg.includes('Tempo limite')) {
+        friendlyError =
+          'Tempo limite ao contatar o Firestore. Verifique se o Cloud Firestore foi criado no Firebase Console (projeto teste-dc3ae).';
+      }
       return {
         success: false,
-        error: error?.message || 'Erro ao sincronizar dados na nuvem.',
+        error: friendlyError,
       };
     }
   }

@@ -57,7 +57,7 @@ export function Header({
   onOpenPDFModal,
   onOpenTransactionModal,
 }: HeaderProps) {
-  const { selectedMonth, setSelectedMonth } = useFinance();
+  const { selectedMonth, setSelectedMonth, isSyncing, cloudSyncError, syncToCloudNow } = useFinance();
   const { user, isConfigured, isQaModeEnabled, signInWithGoogle, signInWithQAMock, logout } = useAuth();
 
   const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
@@ -197,19 +197,27 @@ export function Header({
               >
                 {/* Bolinha / Avatar */}
                 {user ? (
-                  user.photoURL ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={user.photoURL}
-                      alt={user.displayName || user.email || 'Usuário'}
-                      referrerPolicy="no-referrer"
-                      className="w-7 h-7 rounded-full border-2 border-emerald-500/80 object-cover shadow-sm group-hover:scale-105 transition-transform"
-                    />
-                  ) : (
-                    <div className="w-7 h-7 rounded-full bg-emerald-600/30 text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-500/60 shadow-sm group-hover:scale-105 transition-transform">
-                      <UserIcon className="w-3.5 h-3.5" />
-                    </div>
-                  )
+                  <div className="relative">
+                    {user.photoURL ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={user.photoURL}
+                        alt={user.displayName || user.email || 'Usuário'}
+                        referrerPolicy="no-referrer"
+                        className="w-7 h-7 rounded-full border-2 border-emerald-500/80 object-cover shadow-sm group-hover:scale-105 transition-transform"
+                      />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-emerald-600/30 text-emerald-400 flex items-center justify-center font-bold text-xs border border-emerald-500/60 shadow-sm group-hover:scale-105 transition-transform">
+                        <UserIcon className="w-3.5 h-3.5" />
+                      </div>
+                    )}
+                    {isGoogleActive && cloudSyncError && (
+                      <span
+                        className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 border border-gray-900 ring-1 ring-amber-400/50 animate-pulse"
+                        title="Atenção: Erro ao sincronizar com o banco de dados Cloud Firestore"
+                      />
+                    )}
+                  </div>
                 ) : (
                   <div className="w-7 h-7 rounded-full bg-gray-800 border border-gray-700 text-gray-400 flex items-center justify-center shadow-inner group-hover:border-emerald-500/50 group-hover:text-emerald-400 group-hover:scale-105 transition-all">
                     <UserIcon className="w-3.5 h-3.5" />
@@ -332,18 +340,54 @@ export function Header({
                     </button>
                   </div>
                 ) : (
-                  <div className="mt-3.5 pt-3 border-t border-gray-800/80 flex items-center justify-between">
-                    <span className="text-[11px] text-emerald-400 flex items-center gap-1">
-                      <Cloud className="w-3.5 h-3.5" /> Nuvem ativa
-                    </span>
-                    <button
-                      type="button"
-                      onClick={handleSwitchToGuest}
-                      className="text-xs text-red-400 hover:text-red-300 transition flex items-center gap-1"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                      <span>Desconectar Conta Google</span>
-                    </button>
+                  <div className="mt-3.5 pt-3 border-t border-gray-800/80 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[11px] flex items-center gap-1.5 font-medium ${cloudSyncError ? 'text-amber-400' : 'text-emerald-400'}`}>
+                        <Cloud className="w-3.5 h-3.5" />
+                        {cloudSyncError ? 'Aguardando criação do banco Firestore' : (isSyncing ? 'Sincronizando com Firestore...' : 'Nuvem ativa & sincronizada')}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleSwitchToGuest}
+                        className="text-xs text-red-400 hover:text-red-300 transition flex items-center gap-1"
+                      >
+                        <LogOut className="w-3.5 h-3.5" />
+                        <span>Desconectar Conta Google</span>
+                      </button>
+                    </div>
+
+                    {cloudSyncError && (
+                      <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-200 space-y-2 text-left">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                          <div className="space-y-1 w-full">
+                            <p className="font-semibold text-amber-300">Não foi possível salvar no Cloud Firestore</p>
+                            <p className="text-[11px] text-amber-200/90 leading-relaxed whitespace-pre-line">
+                              {cloudSyncError}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="pt-1 flex items-center gap-2 flex-wrap">
+                          <a
+                            href="https://console.firebase.google.com/project/teste-dc3ae/firestore"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-[11px] font-semibold border border-amber-500/30 transition shadow-sm"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>Abrir Firebase Console (Criar Banco Firestore)</span>
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => syncToCloudNow()}
+                            disabled={isSyncing}
+                            className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-200 text-[11px] font-semibold border border-gray-700 transition"
+                          >
+                            {isSyncing ? 'Testando...' : 'Tentar Novamente'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

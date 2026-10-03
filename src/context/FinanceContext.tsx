@@ -50,6 +50,7 @@ interface FinanceContextType {
   resetData: () => void;
   loadDemoData: () => void;
   isSyncing: boolean;
+  cloudSyncError: string | null;
   syncToCloudNow: () => Promise<{ success: boolean; error?: string }>;
 }
 
@@ -67,6 +68,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
   const [categoryMappings, setCategoryMappings] = useState<Record<string, string>>({});
   const [selectedMonth, setSelectedMonth] = useState<string>('2026-10');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
+  const [cloudSyncError, setCloudSyncError] = useState<string | null>(null);
 
   // Sincronização automática quando o usuário faz login com conta Google / Firebase
   useEffect(() => {
@@ -78,6 +80,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         try {
           const cloudData = await loadUserDataFromCloud(user.uid);
           if (isMounted && cloudData) {
+            setCloudSyncError(null);
             if (cloudData.transactions && cloudData.transactions.length > 0) {
               setTransactions(cloudData.transactions);
             }
@@ -97,7 +100,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
               setCategoryMappings(cloudData.categoryMappings);
             }
           } else if (isMounted && transactions.length > 0) {
-            await saveUserDataToCloud(user.uid, {
+            const saveRes = await saveUserDataToCloud(user.uid, {
               transactions,
               budgets,
               goals,
@@ -105,15 +108,21 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
               categories,
               categoryMappings,
             });
+            if (isMounted) {
+              if (saveRes.success) setCloudSyncError(null);
+              else setCloudSyncError(saveRes.error || 'Erro ao salvar no Firestore');
+            }
           }
-        } catch (error) {
+        } catch (error: any) {
           console.error('Erro na sincronização com nuvem:', error);
+          if (isMounted) setCloudSyncError(error?.message || 'Erro na conexão com Firestore');
         } finally {
           if (isMounted) setIsSyncing(false);
         }
       } else {
         // Ao deslogar (voltar ao Modo Convidado), reinicia a memória no Zero State limpo
         if (isMounted) {
+          setCloudSyncError(null);
           setTransactions([]);
           setBudgets([]);
           setGoals([]);
@@ -146,6 +155,8 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       categoryMappings,
     });
     setIsSyncing(false);
+    if (res.success) setCloudSyncError(null);
+    else setCloudSyncError(res.error || 'Erro ao sincronizar');
     return res;
   }, [user, transactions, budgets, goals, wallets, categories, categoryMappings]);
 
@@ -160,6 +171,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
       newMappings: Record<string, string> = categoryMappings
     ) => {
       if (user?.uid) {
+        setIsSyncing(true);
         saveUserDataToCloud(user.uid, {
           transactions: newTx,
           budgets: newBudgets,
@@ -167,7 +179,21 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
           wallets: newWallets,
           categories: newCategories,
           categoryMappings: newMappings,
-        }).catch((err) => console.warn('Erro ao salvar em segundo plano:', err));
+        })
+          .then((res) => {
+            setIsSyncing(false);
+            if (res.success) {
+              setCloudSyncError(null);
+            } else {
+              console.warn('Erro ao salvar no Firestore:', res.error);
+              setCloudSyncError(res.error || 'Erro ao salvar no banco');
+            }
+          })
+          .catch((err) => {
+            setIsSyncing(false);
+            console.warn('Erro ao salvar em segundo plano:', err);
+            setCloudSyncError(err?.message || 'Falha ao conectar com o banco');
+          });
       }
     },
     [user, wallets, categories, categoryMappings]
@@ -522,6 +548,7 @@ export function FinanceProvider({ children }: { children: React.ReactNode }) {
         resetData,
         loadDemoData,
         isSyncing,
+        cloudSyncError,
         syncToCloudNow,
       }}
     >
